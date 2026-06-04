@@ -60,17 +60,9 @@ $customerWebsiteUrl = $customer['website_url'] ?? null;
                 <tr><td style="color:#64748b;padding:6px 0;width:40%;">Name</td><td><?= Security::e($customer['name']) ?></td></tr>
                 <tr><td style="color:#64748b;padding:6px 0;">Company</td><td><?= Security::e($customer['company'] ?? '—') ?></td></tr>
                 <tr><td style="color:#64748b;padding:6px 0;">Phone</td><td><?= Security::e($customer['phone'] ?? '—') ?></td></tr>
-                <tr><td style="color:#64748b;padding:6px 0;">Website</td><td>
-                    <?php if ($customerWebsiteUrl): ?>
-                        <a href="<?= Security::e($customerWebsiteUrl) ?>" target="_blank" rel="noopener"><?= Security::e($customerWebsiteUrl) ?></a>
-                    <?php else: ?><span style="color:#94a3b8;">Not set</span><?php endif; ?>
-                </td></tr>
-                <tr><td style="color:#64748b;padding:6px 0;">Mail Server</td><td>
-                    <?php $ms = \App\Models\User::mailServer($customerWebsiteUrl); ?>
-                    <?= $ms ? Security::e($ms) : '<span style="color:#94a3b8;">—</span>' ?>
-                </td></tr>
+                <tr><td style="color:#64748b;padding:6px 0;">Postcode</td><td><?= Security::e($customer['postcode'] ?? '—') ?></td></tr>
+                <tr><td style="color:#64748b;padding:6px 0;">Branch Number</td><td><?= Security::e($customer['branch_number'] ?? '—') ?></td></tr>
                 <tr><td style="color:#64748b;padding:6px 0;">Account Status</td><td><span class="badge <?= $customer['is_active'] ? 'badge-active' : 'badge-inactive' ?>"><?= $customer['is_active'] ? 'Active' : 'Inactive' ?></span></td></tr>
-                <tr><td style="color:#64748b;padding:6px 0;">Invoices</td><td><span class="badge <?= ($customer['show_invoices'] ?? 1) ? 'badge-active' : 'badge-inactive' ?>"><?= ($customer['show_invoices'] ?? 1) ? 'Visible to customer' : 'Hidden from customer' ?></span></td></tr>
                 <tr><td style="color:#64748b;padding:6px 0;">Member Since</td><td><?= date('j F Y', strtotime($customer['created_at'])) ?></td></tr>
             </table>
         </div>
@@ -98,6 +90,16 @@ $customerWebsiteUrl = $customer['website_url'] ?? null;
                         <div class="form-group">
                             <label>Website URL</label>
                             <input type="text" name="website_url" value="<?= Security::e($customerWebsiteUrl ?? '') ?>" placeholder="https://theirdomain.co.uk">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Postcode</label>
+                            <input type="text" name="postcode" value="<?= Security::e($customer['postcode'] ?? '') ?>" placeholder="LN1 1AA">
+                        </div>
+                        <div class="form-group">
+                            <label>Branch Number</label>
+                            <input type="text" name="branch_number" value="<?= Security::e($customer['branch_number'] ?? '') ?>" placeholder="BR001">
                         </div>
                     </div>
                 </div>

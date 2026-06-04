@@ -135,9 +135,21 @@ $prices = $product ? ($product['prices'] ?? []) : [];
 
         <div class="card">
             <div class="card-body">
+                <div class="form-group">
+                    <label class="form-label">Product Type</label>
+                    <select name="type" class="form-control">
+                        <option value="simple"   <?= ($product['type'] ?? 'simple') === 'simple'   ? 'selected' : '' ?>>Simple</option>
+                        <option value="variable" <?= ($product['type'] ?? 'simple') === 'variable' ? 'selected' : '' ?>>Variable (has variations)</option>
+                    </select>
+                </div>
                 <button type="submit" class="btn btn-primary" style="width:100%;margin-bottom:8px;">
                     <?= $isNew ? 'Create Product' : 'Save Changes' ?>
                 </button>
+                <?php if (!$isNew): ?>
+                <a href="/admin/shop/products/<?= (int)$product['id'] ?>/variations" class="btn btn-secondary" style="width:100%;text-align:center;margin-bottom:8px;">
+                    Manage Variations
+                </a>
+                <?php endif; ?>
                 <a href="/admin/shop/products" class="btn btn-secondary" style="width:100%;text-align:center;">Cancel</a>
             </div>
         </div>

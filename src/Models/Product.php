@@ -143,18 +143,21 @@ class Product
     public static function create(array $data): int
     {
         return DB::insert(
-            'INSERT INTO products (category_id, sku, name, slug, description, stock, low_stock_threshold, is_active, sort_order)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO products (type, category_id, sku, name, slug, description, short_description, stock, low_stock_threshold, is_active, sort_order, woo_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
+                $data['type'] ?? 'simple',
                 $data['category_id'] ?: null,
                 $data['sku'],
                 $data['name'],
                 self::slugify($data['slug'] ?: $data['name']),
                 $data['description'] ?? null,
+                $data['short_description'] ?? null,
                 (int)($data['stock'] ?? 0),
                 (int)($data['low_stock_threshold'] ?? 5),
                 isset($data['is_active']) ? (int)$data['is_active'] : 1,
                 (int)($data['sort_order'] ?? 0),
+                $data['woo_id'] ?? null,
             ]
         );
     }
@@ -162,14 +165,16 @@ class Product
     public static function update(int $id, array $data): void
     {
         DB::execute(
-            'UPDATE products SET category_id = ?, sku = ?, name = ?, slug = ?, description = ?,
-             stock = ?, low_stock_threshold = ?, is_active = ?, sort_order = ? WHERE id = ?',
+            'UPDATE products SET type = ?, category_id = ?, sku = ?, name = ?, slug = ?, description = ?,
+             short_description = ?, stock = ?, low_stock_threshold = ?, is_active = ?, sort_order = ? WHERE id = ?',
             [
+                $data['type'] ?? 'simple',
                 $data['category_id'] ?: null,
                 $data['sku'],
                 $data['name'],
                 self::slugify($data['slug'] ?: $data['name']),
                 $data['description'] ?? null,
+                $data['short_description'] ?? null,
                 (int)($data['stock'] ?? 0),
                 (int)($data['low_stock_threshold'] ?? 5),
                 isset($data['is_active']) ? (int)$data['is_active'] : 1,

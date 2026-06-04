@@ -17,7 +17,9 @@
                 <th>Name</th>
                 <th>Email</th>
                 <th>Company</th>
-                <th>Phone</th>
+                <th>Branch No.</th>
+                <th>Postcode</th>
+                <th>Tier</th>
                 <th>Status</th>
                 <th>Joined</th>
                 <th></th>
@@ -25,16 +27,18 @@
         </thead>
         <tbody>
         <?php if (empty($customers)): ?>
-        <tr><td colspan="7" style="text-align:center;padding:40px;color:#94a3b8;">No customers yet. <a href="/admin/customers/create">Add the first one</a>.</td></tr>
+        <tr><td colspan="9" style="text-align:center;padding:40px;color:#94a3b8;">No customers yet. <a href="/admin/customers/create">Add the first one</a>.</td></tr>
         <?php else: ?>
         <?php foreach ($customers as $c): ?>
         <tr>
             <td><a href="/admin/customers/<?= $c['id'] ?>"><?= Security::e($c['name']) ?></a></td>
-            <td><?= Security::e($c['email']) ?></td>
+            <td style="font-size:13px;"><?= Security::e($c['email']) ?></td>
             <td><?= Security::e($c['company'] ?? '—') ?></td>
-            <td><?= Security::e($c['phone'] ?? '—') ?></td>
+            <td style="font-family:monospace;font-size:13px;"><?= Security::e($c['branch_number'] ?? '—') ?></td>
+            <td style="font-family:monospace;font-size:13px;"><?= Security::e($c['postcode'] ?? '—') ?></td>
+            <td><?= $c['tier_name'] ? '<span class="badge badge-outline">' . Security::e($c['tier_name']) . '</span>' : '—' ?></td>
             <td><span class="badge <?= $c['is_active'] ? 'badge-active' : 'badge-inactive' ?>"><?= $c['is_active'] ? 'Active' : 'Inactive' ?></span></td>
-            <td class="text-muted"><?= date('j M Y', strtotime($c['created_at'])) ?></td>
+            <td class="text-muted" style="font-size:13px;"><?= date('j M Y', strtotime($c['created_at'])) ?></td>
             <td><a href="/admin/customers/<?= $c['id'] ?>" class="btn btn-sm btn-outline">View</a></td>
         </tr>
         <?php endforeach; ?>

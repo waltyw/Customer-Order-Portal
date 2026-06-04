@@ -19,8 +19,14 @@
 <?php
 $currentPath  = '/' . trim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
 $user         = \App\Auth\Auth::user();
+$_tierHidesInvoices = false;
+if (!empty($user['pricing_tier_id'])) {
+    $_tier = \App\Core\DB::fetchOne('SELECT hide_invoices FROM pricing_tiers WHERE id = ?', [(int)$user['pricing_tier_id']]);
+    $_tierHidesInvoices = (bool)($_tier['hide_invoices'] ?? false);
+}
 $showInvoices = \App\Models\Setting::get('invoices_enabled') !== '0'
-             && ($user['show_invoices'] ?? 1);
+             && ($user['show_invoices'] ?? 1)
+             && !$_tierHidesInvoices;
 $logoLinkUrl  = \App\Models\Setting::get('logo_link_url') ?: '/dashboard';
 $logoLinkTarget = str_starts_with($logoLinkUrl, 'http') ? ' target="_blank" rel="noopener"' : '';
 $customLinks  = \App\Models\Setting::menuLinks();

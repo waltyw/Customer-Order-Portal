@@ -28,7 +28,11 @@ class User
     public static function customers(): array
     {
         return DB::fetchAll(
-            'SELECT id, email, name, company, phone, is_active, created_at FROM users WHERE role = ? ORDER BY name ASC',
+            'SELECT u.id, u.email, u.name, u.company, u.phone, u.postcode, u.branch_number,
+                    u.is_active, u.created_at, pt.name AS tier_name
+             FROM users u
+             LEFT JOIN pricing_tiers pt ON pt.id = u.pricing_tier_id
+             WHERE u.role = ? ORDER BY u.name ASC',
             ['customer']
         );
     }
@@ -37,13 +41,16 @@ class User
     {
         $hash = password_hash($data['password'], PASSWORD_BCRYPT, ['cost' => 12]);
         return DB::insert(
-            'INSERT INTO users (email, password_hash, name, company, phone, website_url, role) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO users (email, password_hash, name, company, phone, postcode, branch_number, website_url, role)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 strtolower($data['email']),
                 $hash,
                 $data['name'],
-                $data['company'] ?? null,
-                $data['phone'] ?? null,
+                $data['company']       ?? null,
+                $data['phone']         ?? null,
+                $data['postcode']      ?? null,
+                $data['branch_number'] ?? null,
                 self::normaliseUrl($data['website_url'] ?? null),
                 $data['role'] ?? 'customer',
             ]
@@ -53,11 +60,14 @@ class User
     public static function update(int $id, array $data): void
     {
         DB::execute(
-            'UPDATE users SET name = ?, company = ?, phone = ?, website_url = ?, is_active = ?, show_invoices = ? WHERE id = ?',
+            'UPDATE users SET name = ?, company = ?, phone = ?, postcode = ?, branch_number = ?,
+             website_url = ?, is_active = ?, show_invoices = ? WHERE id = ?',
             [
                 $data['name'],
-                $data['company'] ?? null,
-                $data['phone'] ?? null,
+                $data['company']       ?? null,
+                $data['phone']         ?? null,
+                $data['postcode']      ?? null,
+                $data['branch_number'] ?? null,
                 self::normaliseUrl($data['website_url'] ?? null),
                 $data['is_active'] ?? 1,
                 isset($data['show_invoices']) ? (int)$data['show_invoices'] : 1,

@@ -22,15 +22,16 @@ class AdminController
     {
         Auth::requireAdmin();
         $ticketCounts  = Ticket::counts();
-        $invoiceCounts = Invoice::counts();
-        $recentTickets = array_slice(Ticket::all(), 0, 10);
+        $recentOrders  = array_slice(\App\Models\ShopOrder::all(), 0, 10);
+        $orderCounts   = \App\Models\ShopOrder::counts();
+        $recentTickets = array_slice(Ticket::all(), 0, 5);
 
         View::render('admin/dashboard', [
-            'title'          => 'Admin Dashboard',
-            'ticketCounts'   => $ticketCounts,
-            'invoiceCounts'  => $invoiceCounts,
-            'recentTickets'  => $recentTickets,
-            'opcacheEnabled' => function_exists('opcache_reset'),
+            'title'        => 'Admin Dashboard',
+            'ticketCounts' => $ticketCounts,
+            'orderCounts'  => $orderCounts,
+            'recentOrders' => $recentOrders,
+            'recentTickets'=> $recentTickets,
         ], 'admin');
     }
 
@@ -133,12 +134,14 @@ class AdminController
 
         $tempPassword = bin2hex(random_bytes(8));
         $userId = User::create([
-            'email'       => $email,
-            'password'    => $tempPassword,
-            'name'        => $name,
-            'company'     => $company,
-            'phone'       => $phone,
-            'website_url' => trim($_POST['website_url'] ?? ''),
+            'email'         => $email,
+            'password'      => $tempPassword,
+            'name'          => $name,
+            'company'       => $company,
+            'phone'         => $phone,
+            'postcode'      => trim($_POST['postcode'] ?? ''),
+            'branch_number' => trim($_POST['branch_number'] ?? ''),
+            'website_url'   => trim($_POST['website_url'] ?? ''),
         ]);
 
         Mailer::sendWelcome(['email' => $email, 'name' => $name], $tempPassword);
@@ -191,9 +194,9 @@ class AdminController
         echo "\xEF\xBB\xBF";
 
         $out = fopen('php://output', 'w');
-        fputcsv($out, ['name', 'email', 'company', 'phone', 'website_url']);
-        fputcsv($out, ['Jane Smith', 'jane@example.com', 'Smith Ltd', '07700 000001', 'https://smithltd.co.uk']);
-        fputcsv($out, ['Bob Jones', 'bob@example.com', 'Jones & Co', '07700 000002', '']);
+        fputcsv($out, ['name', 'email', 'company', 'phone', 'postcode', 'branch_number', 'website_url']);
+        fputcsv($out, ['Jane Smith', 'jane@example.com', 'Smith Ltd', '07700 000001', 'LN1 1AA', 'BR001', 'https://smithltd.co.uk']);
+        fputcsv($out, ['Bob Jones', 'bob@example.com', 'Jones & Co', '07700 000002', 'NG1 1BB', 'BR002', '']);
         fclose($out);
         exit;
     }
@@ -268,12 +271,14 @@ class AdminController
 
             $tempPassword = bin2hex(random_bytes(8));
             $userId = User::create([
-                'email'       => $email,
-                'password'    => $tempPassword,
-                'name'        => $name,
-                'company'     => $record['company']     ?? '',
-                'phone'       => $record['phone']       ?? '',
-                'website_url' => $record['website_url'] ?? '',
+                'email'         => $email,
+                'password'      => $tempPassword,
+                'name'          => $name,
+                'company'       => $record['company']       ?? ($record['billing_company'] ?? ''),
+                'phone'         => $record['phone']         ?? ($record['billing_phone'] ?? ''),
+                'postcode'      => $record['postcode']      ?? ($record['billing_postcode'] ?? ''),
+                'branch_number' => $record['branch_number'] ?? '',
+                'website_url'   => $record['website_url']   ?? '',
             ]);
 
             if ($sendEmails) {
@@ -302,11 +307,13 @@ class AdminController
         }
 
         User::update($id, [
-            'name'        => $name,
-            'company'     => trim($_POST['company'] ?? ''),
-            'phone'       => trim($_POST['phone'] ?? ''),
-            'website_url' => trim($_POST['website_url'] ?? ''),
-            'is_active'   => 1,
+            'name'          => $name,
+            'company'       => trim($_POST['company'] ?? ''),
+            'phone'         => trim($_POST['phone'] ?? ''),
+            'postcode'      => trim($_POST['postcode'] ?? ''),
+            'branch_number' => trim($_POST['branch_number'] ?? ''),
+            'website_url'   => trim($_POST['website_url'] ?? ''),
+            'is_active'     => 1,
         ]);
 
         Security::flash('success', 'Customer details updated.');

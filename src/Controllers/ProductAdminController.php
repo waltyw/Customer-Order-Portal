@@ -10,6 +10,7 @@ use App\Core\View;
 use App\Models\Category;
 use App\Models\DeliveryRule;
 use App\Models\Product;
+use App\Models\ProductVariation;
 use App\Models\PricingTier;
 
 class ProductAdminController
@@ -212,59 +213,292 @@ class ProductAdminController
             Security::redirect('/admin/shop/products');
         }
 
-        $tiers   = PricingTier::all();
-        $tierMap = [];
-        foreach ($tiers as $t) {
-            $tierMap[strtolower($t['name'])] = (int)$t['id'];
+        $handle = fopen($_FILES['csv']['tmp_name'], 'r');
+        // Strip BOM
+        $bom = fread($handle, 3);
+        if ($bom !== "\xEF\xBB\xBF") rewind($handle);
+
+        $rawHeaders = fgetcsv($handle);
+        if (!$rawHeaders) {
+            Security::flash('error', 'CSV file is empty or unreadable.');
+            Security::redirect('/admin/shop/products');
         }
 
-        $handle  = fopen($_FILES['csv']['tmp_name'], 'r');
-        $headers = fgetcsv($handle);
-        $imported = 0;
+        // Normalise header names to lowercase, trim whitespace
+        $headers = array_map(fn($h) => strtolower(trim((string)$h)), $rawHeaders);
+        $col     = array_flip($headers); // column name → index
+
+        $tiers   = PricingTier::all();
+        // Build tier column map: "customer price" / "wholesaler price" etc.
+        $tierColMap = [];
+        foreach ($tiers as $t) {
+            $tierColMap[strtolower($t['name']) . ' price'] = (int)$t['id'];
+            $tierColMap[strtolower($t['name'])]            = (int)$t['id'];
+        }
+
+        $isWooCommerce = isset($col['type']); // WooCommerce exports have a Type column
+
+        $imported   = 0;
+        $varBuffer  = []; // SKU => [row data] for variation rows
+        $parentMap  = []; // parent SKU => product ID
+
+        $get = fn(array $row, string $key, string $fallback = '') => trim($row[$col[$key] ?? -1] ?? $fallback);
 
         while (($row = fgetcsv($handle)) !== false) {
-            if (count($row) < 3) continue;
-            $sku  = trim($row[1] ?? '');
-            $name = trim($row[2] ?? '');
-            if (!$sku || !$name) continue;
+            if (empty(array_filter($row))) continue;
 
-            $existing = Product::findBySku($sku);
-            if ($existing) {
-                Product::update((int)$existing['id'], [
-                    'category_id'         => $existing['category_id'],
-                    'sku'                 => $sku,
-                    'name'                => $name,
-                    'slug'                => Product::slugify($name),
-                    'description'         => $existing['description'],
-                    'stock'               => isset($row[4]) ? (int)$row[4] : (int)$existing['stock'],
-                    'low_stock_threshold' => (int)$existing['low_stock_threshold'],
-                    'is_active'           => 1,
-                    'sort_order'          => (int)($row[6] ?? $existing['sort_order']),
-                ]);
-                $productId = (int)$existing['id'];
+            if ($isWooCommerce) {
+                $type   = strtolower($get($row, 'type'));
+                $sku    = $get($row, 'sku');
+                $name   = $get($row, 'name');
+                $parent = $get($row, 'parent');
+
+                if ($type === 'variation') {
+                    // Buffer variations — process after all parents are created
+                    $varBuffer[] = $row;
+                    continue;
+                }
+
+                // simple or variable (parent)
+                $productId = $this->upsertProduct([
+                    'type'              => $type === 'variable' ? 'variable' : 'simple',
+                    'sku'               => $sku,
+                    'name'              => $name ?: $sku,
+                    'description'       => $get($row, 'description'),
+                    'short_description' => $get($row, 'short description'),
+                    'stock'             => (int)$get($row, 'stock'),
+                    'is_active'         => $get($row, 'published', '1') !== '0' ? 1 : 0,
+                    'woo_id'            => (int)($row[$col['id'] ?? -1] ?? 0) ?: null,
+                    'category_name'     => $get($row, 'categories'),
+                    'regular_price'     => (float)$get($row, 'regular price'),
+                ], $tiers, $tierColMap, $col, $row);
+
+                if ($productId) {
+                    $parentMap[$sku] = $productId;
+                    $this->importWooAttributes($productId, $col, $row, $type === 'variable');
+                    $imported++;
+                }
+
             } else {
-                $productId = Product::create([
-                    'sku'   => $sku,
-                    'name'  => $name,
-                    'slug'  => Product::slugify($name),
-                    'stock' => isset($row[4]) ? (int)$row[4] : 0,
-                    'is_active' => 1,
+                // Native portal CSV format
+                $sku  = trim($row[$col['sku'] ?? 1] ?? '');
+                $name = trim($row[$col['name'] ?? 2] ?? '');
+                if (!$sku || !$name) continue;
+
+                $productId = $this->upsertProduct([
+                    'type'          => 'simple',
+                    'sku'           => $sku,
+                    'name'          => $name,
+                    'stock'         => (int)($row[$col['stock'] ?? 4] ?? 0),
+                    'is_active'     => 1,
+                    'regular_price' => 0,
+                    'category_name' => trim($row[$col['category'] ?? 3] ?? ''),
+                ], $tiers, $tierColMap, $col, $row);
+
+                if ($productId) $imported++;
+            }
+        }
+
+        // Process buffered variations
+        foreach ($varBuffer as $row) {
+            $parentSku   = $get($row, 'parent');
+            $parentId    = $parentMap[$parentSku] ?? null;
+            if (!$parentId) continue;
+
+            $varSku   = $get($row, 'sku') ?: ($parentSku . '-var-' . uniqid());
+            $price    = (float)$get($row, 'regular price');
+            $stock    = (int)$get($row, 'stock');
+            $wooId    = (int)($row[$col['id'] ?? -1] ?? 0) ?: null;
+            $published = $get($row, 'published', '1');
+
+            $existing = ProductVariation::findBySku($varSku);
+            if ($existing) {
+                ProductVariation::update((int)$existing['id'], [
+                    'sku'       => $varSku,
+                    'stock'     => $stock,
+                    'is_active' => $published !== '0' ? 1 : 0,
+                ]);
+                $varId = (int)$existing['id'];
+            } else {
+                $varId = ProductVariation::create($parentId, [
+                    'sku'       => $varSku,
+                    'stock'     => $stock,
+                    'is_active' => $published !== '0' ? 1 : 0,
+                    'woo_id'    => $wooId,
                 ]);
             }
 
-            // Import tier prices (columns 7+)
-            foreach ($tiers as $i => $tier) {
-                $col = 7 + $i;
-                if (isset($row[$col]) && $row[$col] !== '') {
-                    Product::setPrice($productId, (int)$tier['id'], (float)$row[$col]);
+            // Price → set for all tiers (use regular price as base; override with specific tier columns if present)
+            foreach ($tiers as $tier) {
+                $tierKey = strtolower($tier['name']) . ' price';
+                if (isset($col[$tierKey]) && $row[$col[$tierKey]] !== '') {
+                    ProductVariation::setPrice($varId, (int)$tier['id'], (float)$row[$col[$tierKey]]);
+                } elseif ($price > 0) {
+                    ProductVariation::setPrice($varId, (int)$tier['id'], $price);
                 }
             }
-            $imported++;
-        }
-        fclose($handle);
 
-        Security::flash('success', "{$imported} product(s) imported.");
+            // Variation attribute values
+            $attrIndex = 1;
+            while (isset($col['attribute ' . $attrIndex . ' name'])) {
+                $attrName = $get($row, 'attribute ' . $attrIndex . ' name');
+                $termName = $get($row, 'attribute ' . $attrIndex . ' value(s)');
+                if ($attrName && $termName) {
+                    $attrId = ProductVariation::findOrCreateAttribute($attrName);
+                    $termId = ProductVariation::findOrCreateTerm($attrId, $termName);
+                    ProductVariation::setAttributeTerm($varId, $attrId, $termId);
+                }
+                $attrIndex++;
+            }
+        }
+
+        fclose($handle);
+        Security::flash('success', "{$imported} product(s) imported" . (count($varBuffer) ? ', ' . count($varBuffer) . ' variation(s) processed' : '') . '.');
         Security::redirect('/admin/shop/products');
+    }
+
+    // ── Variation management ──────────────────────────────────────────────────
+
+    public function variations(int $productId): void
+    {
+        Auth::requireAdmin();
+        $product = Product::find($productId);
+        if (!$product) { http_response_code(404); die('Not found'); }
+
+        View::render('admin/shop-product-variations', [
+            'title'      => 'Variations: ' . $product['name'],
+            'product'    => $product,
+            'variations' => ProductVariation::forProduct($productId),
+            'attributes' => ProductVariation::attributesForProduct($productId),
+            'tiers'      => PricingTier::all(),
+        ], 'admin');
+    }
+
+    public function storeVariation(int $productId): void
+    {
+        Auth::requireAdmin();
+        Security::checkCsrf();
+
+        $varId = ProductVariation::create($productId, [
+            'sku'        => trim($_POST['sku'] ?? ''),
+            'stock'      => (int)($_POST['stock'] ?? 0),
+            'is_active'  => isset($_POST['is_active']) ? 1 : 0,
+            'sort_order' => (int)($_POST['sort_order'] ?? 0),
+        ]);
+
+        foreach ($_POST['prices'] ?? [] as $tierId => $price) {
+            if ($price !== '') ProductVariation::setPrice($varId, (int)$tierId, (float)$price);
+        }
+
+        foreach ($_POST['attr'] ?? [] as $attrId => $termName) {
+            if (!$termName) continue;
+            $termId = ProductVariation::findOrCreateTerm((int)$attrId, $termName);
+            ProductVariation::setAttributeTerm($varId, (int)$attrId, $termId);
+        }
+
+        // Ensure parent is marked variable
+        \App\Core\DB::execute("UPDATE products SET type = 'variable' WHERE id = ?", [$productId]);
+
+        Security::flash('success', 'Variation added.');
+        Security::redirect('/admin/shop/products/' . $productId . '/variations');
+    }
+
+    public function deleteVariation(int $productId, int $varId): void
+    {
+        Auth::requireAdmin();
+        Security::checkCsrf();
+        ProductVariation::delete($varId);
+        Security::flash('success', 'Variation deleted.');
+        Security::redirect('/admin/shop/products/' . $productId . '/variations');
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    private function upsertProduct(array $data, array $tiers, array $tierColMap, array $col, array $row): ?int
+    {
+        $sku  = $data['sku'] ?? '';
+        $name = $data['name'] ?? '';
+        if (!$sku || !$name) return null;
+
+        // Resolve category
+        $categoryId = null;
+        if (!empty($data['category_name'])) {
+            $catName = explode('>', $data['category_name'])[0];
+            $catName = trim(explode(',', $catName)[0]);
+            if ($catName) {
+                $catSlug = Category::slugify($catName);
+                $cat     = \App\Core\DB::fetchOne('SELECT id FROM product_categories WHERE slug = ?', [$catSlug]);
+                if (!$cat) {
+                    $catId = Category::create(['name' => $catName, 'slug' => $catSlug, 'is_active' => 1]);
+                } else {
+                    $catId = (int)$cat['id'];
+                }
+                $categoryId = $catId;
+            }
+        }
+
+        $payload = [
+            'type'              => $data['type'] ?? 'simple',
+            'category_id'       => $categoryId,
+            'sku'               => $sku,
+            'name'              => $name,
+            'slug'              => Product::slugify($name),
+            'description'       => $data['description'] ?? '',
+            'short_description' => $data['short_description'] ?? '',
+            'stock'             => $data['stock'] ?? 0,
+            'is_active'         => $data['is_active'] ?? 1,
+            'woo_id'            => $data['woo_id'] ?? null,
+        ];
+
+        $existing = Product::findBySku($sku);
+        if ($existing) {
+            $payload['low_stock_threshold'] = (int)$existing['low_stock_threshold'];
+            $payload['sort_order'] = (int)$existing['sort_order'];
+            Product::update((int)$existing['id'], $payload);
+            $productId = (int)$existing['id'];
+        } else {
+            $payload['low_stock_threshold'] = 5;
+            $payload['sort_order'] = 0;
+            $productId = Product::create($payload);
+        }
+
+        // Set tier prices — check for explicit tier columns first, fall back to regular price
+        $basePrice = $data['regular_price'] ?? 0;
+        foreach ($tiers as $tier) {
+            $tierKey = strtolower($tier['name']) . ' price';
+            $idx     = $col[$tierKey] ?? -1;
+            if ($idx >= 0 && isset($row[$idx]) && $row[$idx] !== '') {
+                Product::setPrice($productId, (int)$tier['id'], (float)$row[$idx]);
+            } elseif ($basePrice > 0) {
+                Product::setPrice($productId, (int)$tier['id'], $basePrice);
+            }
+        }
+
+        return $productId;
+    }
+
+    private function importWooAttributes(int $productId, array $col, array $row, bool $isVariable): void
+    {
+        $get = fn(string $key) => trim($row[$col[$key] ?? -1] ?? '');
+        $attrIndex = 1;
+        while (isset($col['attribute ' . $attrIndex . ' name'])) {
+            $attrName     = $get('attribute ' . $attrIndex . ' name');
+            $attrValues   = $get('attribute ' . $attrIndex . ' value(s)');
+            $isVariationAttr = $get('attribute ' . $attrIndex . ' global') !== '0';
+
+            if (!$attrName || !$attrValues) { $attrIndex++; continue; }
+
+            $attrId  = ProductVariation::findOrCreateAttribute($attrName);
+            $termIds = [];
+            foreach (explode('|', $attrValues) as $val) {
+                $val = trim($val);
+                if ($val) $termIds[] = ProductVariation::findOrCreateTerm($attrId, $val);
+            }
+            if ($termIds) {
+                ProductVariation::mapAttributeToProduct($productId, $attrId, $termIds, $isVariable && $isVariationAttr);
+            }
+            $attrIndex++;
+        }
     }
 
     private function savePrices(int $productId): void
