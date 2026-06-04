@@ -1,0 +1,15 @@
+.env
+*Copy.env
+*.zip
+vendor/
+*.db
+storage/logs/*
+storage/attachments/*
+!storage/logs/.gitkeep
+!storage/attachments/.gitkeep
+*.log
+.DS_Store
+Thumbs.db
+test.html
+upload-guide.html
+root-htaccess.txt
