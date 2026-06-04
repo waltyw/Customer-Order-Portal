@@ -204,7 +204,7 @@ WHERE s1.id > s2.id AND s1.service_name = s2.service_name;
 
 -- Default admin account — password is "password" — CHANGE IMMEDIATELY after login
 INSERT IGNORE INTO `users` (`email`, `password_hash`, `name`, `role`) VALUES (
-  'admin@beebizzi.co.uk',
+  'ian@beebizzi.co.uk',
   '$2y$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
   'Admin',
   'admin'
@@ -250,5 +250,5 @@ INSERT IGNORE INTO `service_status` (`service_name`, `sort_order`, `status`) VAL
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ── Done ──────────────────────────────────────────────────────────────────────
--- Default login: admin@beebizzi.co.uk / password
+-- Default login: ian@beebizzi.co.uk / password
 -- IMPORTANT: Change the admin password immediately after first login
