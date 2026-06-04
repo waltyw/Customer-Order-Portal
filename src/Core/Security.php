@@ -37,7 +37,7 @@ class Security
 
     public static function checkCsrf(): void
     {
-        $token = $_POST['_csrf'] ?? '';
+        $token = $_POST['_csrf'] ?? ($_POST['csrf_token'] ?? '');
         if (!self::verifyCsrf($token)) {
             http_response_code(403);
             die('Invalid security token. Please go back and try again.');
