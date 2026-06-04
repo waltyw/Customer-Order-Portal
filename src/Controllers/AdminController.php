@@ -132,16 +132,28 @@ class AdminController
             Security::redirect('/admin/customers/create');
         }
 
-        $tempPassword = bin2hex(random_bytes(8));
+        $sameAsBilling = isset($_POST['delivery_same_as_billing']) ? 1 : 0;
+        $tempPassword  = bin2hex(random_bytes(8));
         $userId = User::create([
-            'email'         => $email,
-            'password'      => $tempPassword,
-            'name'          => $name,
-            'company'       => $company,
-            'phone'         => $phone,
-            'postcode'      => trim($_POST['postcode'] ?? ''),
-            'branch_number' => trim($_POST['branch_number'] ?? ''),
-            'website_url'   => trim($_POST['website_url'] ?? ''),
+            'email'                   => $email,
+            'password'                => $tempPassword,
+            'name'                    => $name,
+            'company'                 => $company,
+            'phone'                   => $phone,
+            'branch_number'           => trim($_POST['branch_number']        ?? ''),
+            'billing_address_1'       => trim($_POST['billing_address_1']    ?? ''),
+            'billing_address_2'       => trim($_POST['billing_address_2']    ?? ''),
+            'billing_city'            => trim($_POST['billing_city']         ?? ''),
+            'billing_county'          => trim($_POST['billing_county']       ?? ''),
+            'billing_postcode'        => trim($_POST['billing_postcode']     ?? ''),
+            'billing_country'         => trim($_POST['billing_country']      ?? 'United Kingdom'),
+            'delivery_same_as_billing'=> $sameAsBilling,
+            'delivery_address_1'      => $sameAsBilling ? null : trim($_POST['delivery_address_1']  ?? ''),
+            'delivery_address_2'      => $sameAsBilling ? null : trim($_POST['delivery_address_2']  ?? ''),
+            'delivery_city'           => $sameAsBilling ? null : trim($_POST['delivery_city']       ?? ''),
+            'delivery_county'         => $sameAsBilling ? null : trim($_POST['delivery_county']     ?? ''),
+            'delivery_postcode'       => $sameAsBilling ? null : trim($_POST['delivery_postcode']   ?? ''),
+            'delivery_country'        => $sameAsBilling ? null : trim($_POST['delivery_country']    ?? 'United Kingdom'),
         ]);
 
         Mailer::sendWelcome(['email' => $email, 'name' => $name], $tempPassword);
@@ -194,9 +206,14 @@ class AdminController
         echo "\xEF\xBB\xBF";
 
         $out = fopen('php://output', 'w');
-        fputcsv($out, ['name', 'email', 'company', 'phone', 'postcode', 'branch_number', 'website_url']);
-        fputcsv($out, ['Jane Smith', 'jane@example.com', 'Smith Ltd', '07700 000001', 'LN1 1AA', 'BR001', 'https://smithltd.co.uk']);
-        fputcsv($out, ['Bob Jones', 'bob@example.com', 'Jones & Co', '07700 000002', 'NG1 1BB', 'BR002', '']);
+        fputcsv($out, [
+            'name','email','company','phone','branch_number',
+            'billing_address_1','billing_address_2','billing_city','billing_county','billing_postcode','billing_country',
+            'delivery_same_as_billing',
+            'delivery_address_1','delivery_address_2','delivery_city','delivery_county','delivery_postcode','delivery_country',
+        ]);
+        fputcsv($out, ['Jane Smith','jane@example.com','Smith Ltd','07700 000001','BR001','1 High Street','','Lincoln','Lincolnshire','LN1 1AA','United Kingdom',1,'','','','','','']);
+        fputcsv($out, ['Bob Jones','bob@example.com','Jones & Co','07700 000002','BR002','2 Main Road','Unit 5','Nottingham','Nottinghamshire','NG1 1BB','United Kingdom',0,'5 Depot Lane','','Derby','Derbyshire','DE1 1CC','United Kingdom']);
         fclose($out);
         exit;
     }
@@ -269,16 +286,28 @@ class AdminController
                 continue;
             }
 
-            $tempPassword = bin2hex(random_bytes(8));
+            $sameAsBilling = (int)($record['delivery_same_as_billing'] ?? 1);
+            $tempPassword  = bin2hex(random_bytes(8));
             $userId = User::create([
-                'email'         => $email,
-                'password'      => $tempPassword,
-                'name'          => $name,
-                'company'       => $record['company']       ?? ($record['billing_company'] ?? ''),
-                'phone'         => $record['phone']         ?? ($record['billing_phone'] ?? ''),
-                'postcode'      => $record['postcode']      ?? ($record['billing_postcode'] ?? ''),
-                'branch_number' => $record['branch_number'] ?? '',
-                'website_url'   => $record['website_url']   ?? '',
+                'email'                    => $email,
+                'password'                 => $tempPassword,
+                'name'                     => $name,
+                'company'                  => $record['company']             ?? ($record['billing_company'] ?? ''),
+                'phone'                    => $record['phone']               ?? ($record['billing_phone'] ?? ''),
+                'branch_number'            => $record['branch_number']       ?? '',
+                'billing_address_1'        => $record['billing_address_1']   ?? ($record['billing_address 1'] ?? ''),
+                'billing_address_2'        => $record['billing_address_2']   ?? ($record['billing_address 2'] ?? ''),
+                'billing_city'             => $record['billing_city']        ?? '',
+                'billing_county'           => $record['billing_county']      ?? ($record['billing_state'] ?? ''),
+                'billing_postcode'         => $record['billing_postcode']    ?? ($record['postcode'] ?? ''),
+                'billing_country'          => $record['billing_country']     ?? 'United Kingdom',
+                'delivery_same_as_billing' => $sameAsBilling,
+                'delivery_address_1'       => $sameAsBilling ? null : ($record['delivery_address_1'] ?? ''),
+                'delivery_address_2'       => $sameAsBilling ? null : ($record['delivery_address_2'] ?? ''),
+                'delivery_city'            => $sameAsBilling ? null : ($record['delivery_city']      ?? ''),
+                'delivery_county'          => $sameAsBilling ? null : ($record['delivery_county']    ?? ($record['shipping_state'] ?? '')),
+                'delivery_postcode'        => $sameAsBilling ? null : ($record['delivery_postcode']  ?? ($record['shipping_postcode'] ?? '')),
+                'delivery_country'         => $sameAsBilling ? null : ($record['delivery_country']   ?? 'United Kingdom'),
             ]);
 
             if ($sendEmails) {
@@ -306,14 +335,26 @@ class AdminController
             Security::redirect('/admin/customers/' . $id);
         }
 
+        $sameAsBilling = isset($_POST['delivery_same_as_billing']) ? 1 : 0;
         User::update($id, [
-            'name'          => $name,
-            'company'       => trim($_POST['company'] ?? ''),
-            'phone'         => trim($_POST['phone'] ?? ''),
-            'postcode'      => trim($_POST['postcode'] ?? ''),
-            'branch_number' => trim($_POST['branch_number'] ?? ''),
-            'website_url'   => trim($_POST['website_url'] ?? ''),
-            'is_active'     => 1,
+            'name'                    => $name,
+            'company'                 => trim($_POST['company']              ?? ''),
+            'phone'                   => trim($_POST['phone']                ?? ''),
+            'branch_number'           => trim($_POST['branch_number']        ?? ''),
+            'billing_address_1'       => trim($_POST['billing_address_1']    ?? ''),
+            'billing_address_2'       => trim($_POST['billing_address_2']    ?? ''),
+            'billing_city'            => trim($_POST['billing_city']         ?? ''),
+            'billing_county'          => trim($_POST['billing_county']       ?? ''),
+            'billing_postcode'        => trim($_POST['billing_postcode']     ?? ''),
+            'billing_country'         => trim($_POST['billing_country']      ?? 'United Kingdom'),
+            'delivery_same_as_billing'=> $sameAsBilling,
+            'delivery_address_1'      => $sameAsBilling ? null : trim($_POST['delivery_address_1']  ?? ''),
+            'delivery_address_2'      => $sameAsBilling ? null : trim($_POST['delivery_address_2']  ?? ''),
+            'delivery_city'           => $sameAsBilling ? null : trim($_POST['delivery_city']       ?? ''),
+            'delivery_county'         => $sameAsBilling ? null : trim($_POST['delivery_county']     ?? ''),
+            'delivery_postcode'       => $sameAsBilling ? null : trim($_POST['delivery_postcode']   ?? ''),
+            'delivery_country'        => $sameAsBilling ? null : trim($_POST['delivery_country']    ?? 'United Kingdom'),
+            'is_active'               => 1,
         ]);
 
         Security::flash('success', 'Customer details updated.');

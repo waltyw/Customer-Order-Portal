@@ -36,23 +36,45 @@ class CheckoutController
         $vatAmount  = $vatEnabled ? round(($totals['subtotal'] + $delivery) * ($vatRate / 100), 2) : 0.0;
         $total      = round($totals['subtotal'] + $delivery + $vatAmount, 2);
 
-        $addresses = Address::forUser((int)$user['id']);
-        $method    = $user['checkout_method'] ?? 'stripe';
+        $method = $user['checkout_method'] ?? 'stripe';
+
+        // Build default addresses from the user's profile
+        $profileBilling = array_filter([
+            'line1'    => $user['billing_address_1'] ?? '',
+            'line2'    => $user['billing_address_2'] ?? '',
+            'city'     => $user['billing_city']      ?? '',
+            'county'   => $user['billing_county']    ?? '',
+            'postcode' => $user['billing_postcode']  ?? '',
+            'country'  => $user['billing_country']   ?? 'United Kingdom',
+            'company'  => $user['company']           ?? '',
+        ]);
+
+        $sameDelivery = (int)($user['delivery_same_as_billing'] ?? 1);
+        $profileDelivery = $sameDelivery ? $profileBilling : array_filter([
+            'line1'    => $user['delivery_address_1'] ?? '',
+            'line2'    => $user['delivery_address_2'] ?? '',
+            'city'     => $user['delivery_city']      ?? '',
+            'county'   => $user['delivery_county']    ?? '',
+            'postcode' => $user['delivery_postcode']  ?? '',
+            'country'  => $user['delivery_country']   ?? 'United Kingdom',
+            'company'  => $user['company']            ?? '',
+        ]);
 
         View::render('customer/checkout', [
-            'title'       => 'Checkout',
-            'items'       => $items,
-            'subtotal'    => $totals['subtotal'],
-            'delivery'    => $delivery,
-            'vatAmount'   => $vatAmount,
-            'vatEnabled'  => $vatEnabled,
-            'vatRate'     => $vatRate,
-            'total'       => $total,
-            'tierId'      => $tierId,
-            'addresses'   => $addresses,
-            'method'      => $method,
-            'currency'    => Setting::get('shop_default_currency') ?: 'GBP',
-            'basketCount' => array_sum(array_column($items, 'quantity')),
+            'title'           => 'Checkout',
+            'items'           => $items,
+            'subtotal'        => $totals['subtotal'],
+            'delivery'        => $delivery,
+            'vatAmount'       => $vatAmount,
+            'vatEnabled'      => $vatEnabled,
+            'vatRate'         => $vatRate,
+            'total'           => $total,
+            'tierId'          => $tierId,
+            'profileBilling'  => $profileBilling,
+            'profileDelivery' => $profileDelivery,
+            'method'          => $method,
+            'currency'        => Setting::get('shop_default_currency') ?: 'GBP',
+            'basketCount'     => array_sum(array_column($items, 'quantity')),
             'user'        => $user,
         ]);
     }
