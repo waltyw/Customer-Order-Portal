@@ -1,15 +1,27 @@
+# Credentials
 .env
 *Copy.env
-*.zip
+
+# Dependencies
 vendor/
-*.db
+
+# Uploads & generated files
+public/assets/img/products/*
+!public/assets/img/products/.gitkeep
 storage/logs/*
 storage/attachments/*
 !storage/logs/.gitkeep
 !storage/attachments/.gitkeep
-*.log
+
+# Archives & databases
+*.zip
+*.db
+*.sql.bak
+
+# OS & editor
 .DS_Store
 Thumbs.db
-test.html
-upload-guide.html
-root-htaccess.txt
+*.log
+.idea/
+.vscode/
+*.swp
