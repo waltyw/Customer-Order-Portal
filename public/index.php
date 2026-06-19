@@ -59,7 +59,7 @@ $routes = [
     'GET /invoices'                => [InvoiceController::class,   'index'],
     'GET /account'                 => [AccountController::class,   'index'],
     'POST /account'                => [AccountController::class,   'update'],
-    'POST /account/add-website'    => [AccountController::class,   'addWebsite'],
+    'POST /account/address'        => [AccountController::class,   'updateAddress'],
     'GET /help'                    => [HelpController::class,      'index'],
     'GET /payment/success'         => [PaymentController::class,   'success'],
     'GET /payment/cancelled'       => [PaymentController::class,   'cancelled'],
@@ -129,7 +129,7 @@ $dynamicRoutes = [
     '#^POST /admin/customers/(\d+)/remove-website/(\d+)$#' => [AdminController::class, 'removeWebsite'],
     '#^POST /admin/customers/(\d+)/toggle$#'        => [AdminController::class, 'toggleCustomer'],
     '#^POST /admin/customers/(\d+)/toggle-invoices$#' => [AdminController::class, 'toggleInvoices'],
-    '#^POST /account/remove-website/(\d+)$#'        => [AccountController::class, 'removeWebsite'],
+    // website routes removed — WVM does not use website management
     '#^GET /admin/tickets/(\d+)$#'          => [AdminController::class,   'viewTicket'],
     '#^POST /admin/tickets/(\d+)/reply$#'   => [AdminController::class,   'replyTicket'],
     '#^POST /admin/tickets/(\d+)/status$#'  => [AdminController::class,   'updateTicketStatus'],

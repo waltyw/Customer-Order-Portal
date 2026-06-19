@@ -8,11 +8,13 @@ use App\Auth\Auth;
 use App\Core\Security;
 use App\Core\Stripe;
 use App\Core\View;
+use App\Email\Mailer;
 use App\Models\Address;
 use App\Models\Basket;
 use App\Models\DeliveryRule;
 use App\Models\Setting;
 use App\Models\ShopOrder;
+use App\Models\User;
 
 class CheckoutController
 {
@@ -166,6 +168,13 @@ class CheckoutController
         $this->saveOrderItems($orderId, $items);
         Basket::clear((int)$basket['id']);
 
+        // Send confirmation email
+        $order = ShopOrder::find($orderId);
+        $user  = Auth::user();
+        if ($order && $user) {
+            Mailer::sendOrderConfirmation($order, User::find((int)$user['id']) ?? $user);
+        }
+
         Security::redirect('/orders/' . $orderId . '/confirmation');
     }
 
@@ -263,13 +272,18 @@ class CheckoutController
         if (!empty($_GET['session_id']) && $order['checkout_method'] === 'stripe') {
             try {
                 $session = Stripe::retrieveSession($_GET['session_id']);
-                if (($session['payment_status'] ?? '') === 'paid') {
+                if (($session['payment_status'] ?? '') === 'paid' && $order['status'] !== 'confirmed') {
                     ShopOrder::updateStripePayment(
                         $orderId,
                         $session['payment_intent'] ?? '',
                         'confirmed'
                     );
                     $order['status'] = 'confirmed';
+                    // Send confirmation email on first successful payment
+                    $fullUser = User::find((int)$user['id']);
+                    if ($fullUser) {
+                        Mailer::sendOrderConfirmation(array_merge($order, ['id' => $orderId]), $fullUser);
+                    }
                 }
             } catch (\Exception $e) {
                 error_log('Stripe session retrieve error: ' . $e->getMessage());

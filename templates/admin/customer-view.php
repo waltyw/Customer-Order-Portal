@@ -52,6 +52,14 @@ $sameDelivery = (int)($c['delivery_same_as_billing'] ?? 1);
                     <tr><td style="color:var(--text-muted);padding:4px 0;">Company</td><td><?= $e($c['company']) ?: '—' ?></td></tr>
                     <tr><td style="color:var(--text-muted);padding:4px 0;">Phone</td><td><?= $e($c['phone']) ?: '—' ?></td></tr>
                     <tr><td style="color:var(--text-muted);padding:4px 0;">Branch No.</td><td><?= $e($c['branch_number']) ?: '—' ?></td></tr>
+                    <?php if (!empty($c['cc_email_1'])): ?>
+                    <tr><td style="color:var(--text-muted);padding:4px 0;">CC Email 1</td><td><?= $e($c['cc_email_1']) ?></td></tr>
+                    <?php endif; ?>
+                    <?php if (!empty($c['cc_email_2'])): ?>
+                    <tr><td style="color:var(--text-muted);padding:4px 0;">CC Email 2</td><td><?= $e($c['cc_email_2']) ?></td></tr>
+                    <?php endif; ?>
+                    <tr><td style="color:var(--text-muted);padding:4px 0;">Pricing Tier</td><td><?= $tier ? $e($tier['name']) : '<span style="color:var(--text-muted);">None</span>' ?></td></tr>
+                    <tr><td style="color:var(--text-muted);padding:4px 0;">Checkout</td><td><?= ($c['checkout_method'] ?? 'stripe') === 'po' ? 'Purchase Order' : 'Card (Stripe)' ?></td></tr>
                     <tr><td style="color:var(--text-muted);padding:4px 0;">Status</td><td><span class="badge <?= $c['is_active'] ? 'badge-active' : 'badge-inactive' ?>"><?= $c['is_active'] ? 'Active' : 'Inactive' ?></span></td></tr>
                     <tr><td style="color:var(--text-muted);padding:4px 0;">Member Since</td><td><?= date('j M Y', strtotime($c['created_at'])) ?></td></tr>
                 </table>
@@ -107,6 +115,31 @@ $sameDelivery = (int)($c['delivery_same_as_billing'] ?? 1);
                 <div class="form-row">
                     <div class="form-group"><label>Phone</label><input type="text" name="phone" value="<?= $e($c['phone']) ?>"></div>
                     <div class="form-group"><label>Branch Number</label><input type="text" name="branch_number" value="<?= $e($c['branch_number']) ?>" placeholder="BR001"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>CC Email 1 <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label><input type="email" name="cc_email_1" value="<?= $e($c['cc_email_1'] ?? '') ?>" placeholder="cc@example.com"></div>
+                    <div class="form-group"><label>CC Email 2 <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label><input type="email" name="cc_email_2" value="<?= $e($c['cc_email_2'] ?? '') ?>" placeholder="cc@example.com"></div>
+                </div>
+                <p style="margin:-8px 0 12px;font-size:12px;color:var(--text-muted);">CC emails receive copies of invoices and order confirmations. They cannot be used to log in.</p>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Pricing Tier</label>
+                        <select name="pricing_tier_id">
+                            <option value="">— No tier —</option>
+                            <?php foreach ($tiers as $t): ?>
+                            <option value="<?= (int)$t['id'] ?>" <?= ((int)($c['pricing_tier_id'] ?? 0) === (int)$t['id']) ? 'selected' : '' ?>>
+                                <?= $e($t['name']) ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Checkout Method</label>
+                        <select name="checkout_method">
+                            <option value="stripe" <?= ($c['checkout_method'] ?? 'stripe') === 'stripe' ? 'selected' : '' ?>>Card (Stripe)</option>
+                            <option value="po"     <?= ($c['checkout_method'] ?? '') === 'po'     ? 'selected' : '' ?>>Purchase Order (PO)</option>
+                        </select>
+                    </div>
                 </div>
 
                 <hr style="border:none;border-top:1px solid var(--border);margin:20px 0;">

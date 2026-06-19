@@ -83,6 +83,47 @@ class Mailer
         return self::send($user['email'], $user['name'], "Invoice {$num} is ready — {$amount} due", $html);
     }
 
+    public static function sendOrderConfirmation(array $order, array $user): bool
+    {
+        $ref      = htmlspecialchars($order['reference']);
+        $method   = strtoupper($order['checkout_method'] ?? 'stripe');
+        $po       = !empty($order['po_number']) ? htmlspecialchars($order['po_number']) : '—';
+        $subtotal = '£' . number_format((float)($order['subtotal'] ?? 0), 2);
+        $delivery = '£' . number_format((float)($order['delivery_charge'] ?? 0), 2);
+        $vat      = '£' . number_format((float)($order['vat_amount'] ?? 0), 2);
+        $total    = '£' . number_format((float)($order['total'] ?? 0), 2);
+
+        $methodRow = $method === 'PO'
+            ? "<tr><td style='padding:8px;border:1px solid #e2e8f0;background:#f8faff;'><strong>PO Number</strong></td><td style='padding:8px;border:1px solid #e2e8f0;background:#f8faff;'>{$po}</td></tr>"
+            : "<tr><td style='padding:8px;border:1px solid #e2e8f0;background:#f8faff;'><strong>Payment</strong></td><td style='padding:8px;border:1px solid #e2e8f0;background:#f8faff;'>Card (Stripe)</td></tr>";
+
+        $html = <<<HTML
+        <p>Hello {$user['name']},</p>
+        <p>Thank you — your order has been received and is being processed.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+            <tr><td style="padding:8px;border:1px solid #e2e8f0;"><strong>Order Reference</strong></td><td style="padding:8px;border:1px solid #e2e8f0;">{$ref}</td></tr>
+            {$methodRow}
+            <tr><td style="padding:8px;border:1px solid #e2e8f0;"><strong>Subtotal</strong></td><td style="padding:8px;border:1px solid #e2e8f0;">{$subtotal}</td></tr>
+            <tr><td style="padding:8px;border:1px solid #e2e8f0;"><strong>Delivery</strong></td><td style="padding:8px;border:1px solid #e2e8f0;">{$delivery}</td></tr>
+            <tr><td style="padding:8px;border:1px solid #e2e8f0;"><strong>VAT</strong></td><td style="padding:8px;border:1px solid #e2e8f0;">{$vat}</td></tr>
+            <tr><td style="padding:8px;border:1px solid #e2e8f0;background:#f0fdf4;"><strong>Total</strong></td><td style="padding:8px;border:1px solid #e2e8f0;background:#f0fdf4;font-weight:700;">{$total}</td></tr>
+        </table>
+        <p><a href="{$_ENV['APP_URL']}/orders/{$order['id']}" style="background:#2563eb;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;">View Order</a></p>
+        <p style="color:#64748b;font-size:13px;">If you have any questions about your order please <a href="{$_ENV['APP_URL']}/tickets/create">raise a support ticket</a>.</p>
+        HTML;
+
+        $sent = self::send($user['email'], $user['name'], "Order Confirmed — {$ref}", $html);
+
+        // CC any cc_email addresses on the account
+        foreach (['cc_email_1', 'cc_email_2'] as $key) {
+            if (!empty($user[$key]) && filter_var($user[$key], FILTER_VALIDATE_EMAIL)) {
+                self::send($user[$key], $user['name'], "Order Confirmed — {$ref}", $html);
+            }
+        }
+
+        return $sent;
+    }
+
     public static function sendWelcome(array $user, string $tempPassword): bool
     {
         $name = htmlspecialchars($user['name']);

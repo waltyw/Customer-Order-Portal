@@ -37,6 +37,26 @@
                     <input type="text" name="branch_number" value="<?= Security::e($_POST['branch_number'] ?? '') ?>" placeholder="e.g. BR001">
                 </div>
             </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Pricing Tier</label>
+                    <select name="pricing_tier_id">
+                        <option value="">— No tier assigned —</option>
+                        <?php foreach ($tiers as $t): ?>
+                        <option value="<?= (int)$t['id'] ?>" <?= ((int)($_POST['pricing_tier_id'] ?? 0) === (int)$t['id']) ? 'selected' : '' ?>>
+                            <?= Security::e($t['name']) ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Checkout Method</label>
+                    <select name="checkout_method">
+                        <option value="stripe" <?= ($_POST['checkout_method'] ?? 'stripe') === 'stripe' ? 'selected' : '' ?>>Card (Stripe)</option>
+                        <option value="po"     <?= ($_POST['checkout_method'] ?? '') === 'po'     ? 'selected' : '' ?>>Purchase Order (PO)</option>
+                    </select>
+                </div>
+            </div>
         </div>
     </div>
 

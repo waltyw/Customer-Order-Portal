@@ -113,6 +113,18 @@ class User
             isset($data['show_invoices']) ? (int)$data['show_invoices'] : 1,
         ];
 
+        if (in_array('cc_email_1', $hasCols)) {
+            $cc1 = strtolower(trim($data['cc_email_1'] ?? ''));
+            $sets[]   = 'cc_email_1 = ?';
+            $params[] = ($cc1 && filter_var($cc1, FILTER_VALIDATE_EMAIL)) ? $cc1 : null;
+        }
+
+        if (in_array('cc_email_2', $hasCols)) {
+            $cc2 = strtolower(trim($data['cc_email_2'] ?? ''));
+            $sets[]   = 'cc_email_2 = ?';
+            $params[] = ($cc2 && filter_var($cc2, FILTER_VALIDATE_EMAIL)) ? $cc2 : null;
+        }
+
         if (in_array('branch_number', $hasCols)) {
             $sets[]   = 'branch_number = ?';
             $params[] = $data['branch_number'] ?? null;

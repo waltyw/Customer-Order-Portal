@@ -36,6 +36,11 @@ DELIMITER ;
 CALL _add_col('users', 'postcode',      'VARCHAR(20)  DEFAULT NULL AFTER `phone`');
 CALL _add_col('users', 'branch_number', 'VARCHAR(50)  DEFAULT NULL AFTER `postcode`');
 
+-- ── Users table: CC email addresses ──────────────────────────────────────────
+
+CALL _add_col('users', 'cc_email_1', 'VARCHAR(255) DEFAULT NULL AFTER `email`');
+CALL _add_col('users', 'cc_email_2', 'VARCHAR(255) DEFAULT NULL AFTER `cc_email_1`');
+
 -- ── Users table: billing address ─────────────────────────────────────────────
 
 CALL _add_col('users', 'billing_address_1', 'VARCHAR(255) DEFAULT NULL AFTER `branch_number`');

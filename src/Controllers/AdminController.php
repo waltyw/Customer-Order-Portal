@@ -10,6 +10,7 @@ use App\Core\View;
 use App\Email\Mailer;
 use App\Models\Faq;
 use App\Models\Invoice;
+use App\Models\PricingTier;
 use App\Models\ServiceStatus;
 use App\Models\Setting;
 use App\Models\Ticket;
@@ -104,7 +105,10 @@ class AdminController
     public function createCustomer(): void
     {
         Auth::requireAdmin();
-        View::render('admin/customer-create', ['title' => 'Add Customer'], 'admin');
+        View::render('admin/customer-create', [
+            'title' => 'Add Customer',
+            'tiers' => PricingTier::all(),
+        ], 'admin');
     }
 
     public function storeCustomer(): void
@@ -156,6 +160,14 @@ class AdminController
             'delivery_country'        => $sameAsBilling ? null : trim($_POST['delivery_country']    ?? 'United Kingdom'),
         ]);
 
+        // Set pricing tier and checkout method
+        $tierId         = ($_POST['pricing_tier_id'] ?? '') !== '' ? (int)$_POST['pricing_tier_id'] : null;
+        $checkoutMethod = in_array($_POST['checkout_method'] ?? '', ['stripe', 'po']) ? $_POST['checkout_method'] : 'stripe';
+        \App\Core\DB::execute(
+            'UPDATE users SET pricing_tier_id = ?, checkout_method = ? WHERE id = ?',
+            [$tierId, $checkoutMethod, $userId]
+        );
+
         Mailer::sendWelcome(['email' => $email, 'name' => $name], $tempPassword);
 
         Security::flash('success', "Customer {$name} created. Welcome email sent.");
@@ -173,6 +185,8 @@ class AdminController
         $stats    = User::stats($id);
         $tickets  = Ticket::forUser($id);
         $invoices = Invoice::forUser($id);
+        $tiers    = PricingTier::all();
+        $tier     = $customer['pricing_tier_id'] ? PricingTier::find((int)$customer['pricing_tier_id']) : null;
         try {
             $websites = Website::forUser($id);
         } catch (\Throwable) {
@@ -186,6 +200,8 @@ class AdminController
             'tickets'  => $tickets,
             'invoices' => $invoices,
             'websites' => $websites,
+            'tiers'    => $tiers,
+            'tier'     => $tier,
         ], 'admin');
     }
 
@@ -340,6 +356,8 @@ class AdminController
             'name'                    => $name,
             'company'                 => trim($_POST['company']              ?? ''),
             'phone'                   => trim($_POST['phone']                ?? ''),
+            'cc_email_1'              => trim($_POST['cc_email_1']           ?? ''),
+            'cc_email_2'              => trim($_POST['cc_email_2']           ?? ''),
             'branch_number'           => trim($_POST['branch_number']        ?? ''),
             'billing_address_1'       => trim($_POST['billing_address_1']    ?? ''),
             'billing_address_2'       => trim($_POST['billing_address_2']    ?? ''),
@@ -356,6 +374,13 @@ class AdminController
             'delivery_country'        => $sameAsBilling ? null : trim($_POST['delivery_country']    ?? 'United Kingdom'),
             'is_active'               => 1,
         ]);
+
+        $tierId         = ($_POST['pricing_tier_id'] ?? '') !== '' ? (int)$_POST['pricing_tier_id'] : null;
+        $checkoutMethod = in_array($_POST['checkout_method'] ?? '', ['stripe', 'po']) ? $_POST['checkout_method'] : 'stripe';
+        \App\Core\DB::execute(
+            'UPDATE users SET pricing_tier_id = ?, checkout_method = ? WHERE id = ?',
+            [$tierId, $checkoutMethod, $id]
+        );
 
         Security::flash('success', 'Customer details updated.');
         Security::redirect('/admin/customers/' . $id);
